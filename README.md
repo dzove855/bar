@@ -2,7 +2,7 @@
 A simple archive tool in pure bash using baee64 and stat
 
 ## HELP
-`
+
 
 Usage: bar.sh [Xlvxh]
 
@@ -37,7 +37,7 @@ Usage: bar.sh [Xlvxh]
     NOTE:
         Currently no compression is scripted
         Currently you can't extract single files in current directory
-`
+
 
 # WHY?
 Well it's fun :D
