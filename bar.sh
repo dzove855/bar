@@ -55,6 +55,7 @@ $USAGE
 
 shopt -s nullglob
 shopt -s extglob
+shopt -s globstar
 shopt -s dotglob
 
 _quit(){
@@ -73,19 +74,18 @@ _cat(){ printf '%s' "$(<$1)"; }
 barCreate() {
     local counter=0
 
-    # XXX: We could jsute use superglob
-    dir(){ local file; for file in "${1%/}/"*; do [[ -d "$file" ]] && dir "$file" || barFiles+=($file); done }
-    # Get files and look if it is directory or not
-    for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then unset files[$key]; dir "${files[$key]}"; else barFiles+=("${files[$key]}"); fi; done
+    for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then barFiles+=("${files[$key]}"/**); else barFiles+=("${files[$key]}"); fi; done
 
-    for file in "${barFiles[@]}"; do ((counter++)); printf '%s %s,' "$file" "$counter"; done > "$barName"
+    for file in "${barFiles[@]}"; do if ! [[ -d "$file" ]]; then ((counter++)); printf '%s %s,' "$file" "$counter"; fi; done > "$barName"
     printf '\n' >> "$barName"
 
     # Now create the bar assoc
     for file in "${barFiles[@]}"; do
-        content="$(_cat $file | base64 -w 0)"
-        read -r _ chmod uid gid < <(stat -c '%t %a %u %g' $file)
-        printf '%s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$content"
+        if ! [[ -d "$file" ]]; then
+            content="$(_cat $file | base64 -w 0)"
+            read -r _ chmod uid gid < <(stat -c '%t %a %u %g' $file)
+            printf '%s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$content"
+        fi
     done >> "$barName"
 }
 
@@ -122,6 +122,7 @@ barView(){
     printf '%s' "$content" | base64 -d | ${PAGER:-less}
 
 }
+
 barList(){
     while IFS=, read -ra file; do
         printf '%s\n' "${file[@]%% *}"
