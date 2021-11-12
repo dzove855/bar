@@ -37,6 +37,14 @@ Usage: bar.sh [Xlvxh]
     NOTE:
         Currently no compression is scripted
         Currently you can't extract single files in current directory
+        
+# TODO
+* Implement https:////github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
+* Implement append
+* Implement edit
+* Implement remove
+* Implement timestamp
+* Implement extract with permissions
 
 
 # WHY?
