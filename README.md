@@ -10,6 +10,7 @@ Usage: bar.sh [Xlvxh]
         -X      Extract
         -l      list
         -v      View
+        -n      No dot files
         -s      Dry-run
         -x      Xtrace
 
