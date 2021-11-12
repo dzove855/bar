@@ -12,7 +12,7 @@
 SELF="${BASH_SOURCE[0]##*/}"
 NAME="${SELF%.sh}"
 
-OPTS="Xlvxh"
+OPTS="Xlvnxh"
 USAGE="Usage: $SELF [$OPTS]"
 
 HELP="
@@ -22,6 +22,7 @@ $USAGE
         -X      Extract
         -l      list
         -v      View
+        -n      No dot files
         -s      Dry-run
         -x      Xtrace
 
@@ -163,6 +164,9 @@ while getopts "${OPTS}" arg; do
         ;;
         l)
             mode=list
+        ;;
+        n)
+            shopt -u dotglob
         ;;
         h)
             _quit 0 "$HELP"
