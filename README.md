@@ -4,13 +4,16 @@ A simple archive tool in pure bash using baee64 and stat
 ## HELP
 
 
-Usage: bar.sh [Xlvxh]
+Usage: bar.sh [azRXlvnxh]
 
     Options:
+        -a      Append
         -X      Extract
         -l      list
         -v      View
         -n      No dot files
+        -R      Don't restore rights
+        -z      Compress
         -s      Dry-run
         -x      Xtrace
 
@@ -34,18 +37,19 @@ Usage: bar.sh [Xlvxh]
             Extract custom files in a different folder:
                 bar.sh -X NAME.bar folder FILE1 FILE2
 
-
+    Environment Variable:
+        BAR_COMPRESS    default : gzip
+        BAR_UNCOMPRESS  default : gunzip
+        
     NOTE:
         Currently no compression is scripted
         Currently you can't extract single files in current directory
         
 # TODO
 * Implement https:////github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
-* Implement append
 * Implement edit
 * Implement remove
 * Implement timestamp
-* Implement extract with permissions
 
 
 # WHY?
