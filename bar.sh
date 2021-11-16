@@ -5,7 +5,6 @@
 # TODO: Implement https:////github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
 # TODO: Implement edit
 # TODO: Implement remove
-# TODO: Implement timestamp
 
 SELF="${BASH_SOURCE[0]##*/}"
 NAME="${SELF%.sh}"
@@ -92,14 +91,15 @@ barCreate() {
     for file in "${barFiles[@]}"; do
         if ! [[ -d "$file" ]]; then
             barFileInfo
-            printf '%s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$content"
+            printf '%s %s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$timestamp" "$content"
         fi
     done >> "$barName"
 }
 
 barFileInfo(){
     content="$(base64 -w 0 $file)"
-    read -r _ chmod uid gid < <(stat -c '%t %a %u %g' $file)
+    read -r _ chmod uid gid timestamp < <(stat -c '%t %a %u %g %y' $file)
+    timestamp="${timestamp// /#}"
 }
 
 barGetLine(){
@@ -134,7 +134,7 @@ barAppend(){
     for file in "${barFiles[@]}"; do
         if ! [[ -d "$file" ]]; then
             barFileInfo
-            printf '%s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$content"
+            printf '%s %s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$timestamp" "$content"
         fi
     done >> "$tmpBarFile"
 
@@ -147,8 +147,8 @@ barGetInfo(){
     local line=$(barGetLine)
     while read ; do
         (( ( counter + 1 ) == line )) && {
-            read -r name chmod uid gid content
-            printf '%s %s %s %s %s' "$name" "$chmod" "$uid" "$gid" "$content"
+            read -r name chmod uid gid timestamp content
+            printf '%s %s %s %s %s %s' "$name" "$chmod" "$uid" "$gid" "$timestamp" "$content"
             return
         }
         (( counter++ ))
@@ -158,7 +158,7 @@ barGetInfo(){
 barView(){
     local info=$(barGetInfo)
     [[ -z "$info" ]] && _quit 2 "File not found"
-    read -r _ _ _ _ content <<<"$info"
+    read -r _ _ _ _ _ content <<<"$info"
     printf '%s' "$content" | base64 -d | ${PAGER:-less}
     
 }
@@ -180,15 +180,16 @@ barExtractFile(){
 
 barExtractRights(){
     if [[ -z "$noRights" ]]; then
-        chown "$uid:$gid"   "${destination%/}/$name"
-        chmod "$chmod"      "${destination%/}/$name"
+        touch -d "${timestamp//#/ }"    "${destination%/}/$name"
+        chown "$uid:$gid"               "${destination%/}/$name"
+        chmod "$chmod"                  "${destination%/}/$name"
     fi
 }
 
 barExtract(){
     local skip=1
     if [[ -z "${files[@]}" ]]; then
-        while read -r name chmod uid gid content; do
+        while read -r name chmod uid gid timestamp content; do
             ! [[ -z $skip ]] && { unset skip; continue; }
             barExtractMkdir
             barExtractFile
@@ -198,7 +199,7 @@ barExtract(){
         for file in "${files[@]}"; do
             info="$(barGetInfo)"
             [[ -z "$info" ]] && _quit 2 "File ($file) not found"
-            read -r name chmod uid gid content <<<"$info"
+            read -r name chmod uid gid timestamp content <<<"$info"
             barExtractMkdir
             barExtractFile
             barExtractRights
