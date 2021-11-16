@@ -211,14 +211,12 @@ barExtract(){
 
 barCompress(){
     if ! [[ -z "$compress" ]]; then
-        : "${BAR_COMPRESS:=gzip}"
         ${BAR_COMPRESS} "${barName}"
     fi
 }
 
 barUncompress(){
     if ! [[ -z "$compress" ]]; then
-        : "${BAR_UNCOMPRESS:=gunzip}"
         ${BAR_UNCOMPRESS} "${barName}"
         barName="${barName%.*}"
     fi
