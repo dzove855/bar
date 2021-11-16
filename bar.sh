@@ -98,7 +98,7 @@ barCreate() {
 }
 
 barFileInfo(){
-    content="$($BAR_CAT $file | base64 -w 0)"
+    content="$(base64 -w 0 $file)"
     read -r _ chmod uid gid < <(stat -c '%t %a %u %g' $file)
 }
 
