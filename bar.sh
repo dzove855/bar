@@ -21,7 +21,7 @@ $USAGE
         -a      Append
         -X      Extract
         -l      list
-        -v      View
+        -v      View       
         -n      No dot files
         -R      Don't restore rights
         -z      Compress
@@ -37,19 +37,21 @@ $USAGE
 
         List files in bar
             $SELF -l NAME.bar
+    
         Extract:
             Extract files in a different folder:
                 $SELF -X NAME.bar folder
 
             Extract files in current folder:
-                $SELF -X NAME.bar
-
+                $SELF -X NAME.bar 
+    
             Extract custom files in a different folder:
                 $SELF -X NAME.bar folder FILE1 FILE2
 
     Environment Variable:
         BAR_COMPRESS    default : gzip
         BAR_UNCOMPRESS  default : gunzip
+        BAR_CAT         default : _cat
 
     NOTE:
         Currently no compression is scripted
@@ -74,15 +76,21 @@ _quit(){
 # This can decrease performance
 
 _cat(){ printf '%s' "$(<$1)"; }
+
+barFindFiles(){
+    # Find files to archive and skeep directories
+    for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then barFiles+=("${files[$key]}"/**); else barFiles+=("${files[$key]}"); fi; done
+    
+    # Get files indexation
+    for file in "${barFiles[@]}"; do if ! [[ -d "$file" ]]; then ((counter++)); printf '%s %s,' "$file" "$counter"; fi; done
+    printf '\n'
+}
+
 barCreate() {
     local counter=0
 
-    for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then barFiles+=("${files[$key]}"/**); else barFiles+=("${files[$key]}"); fi; done
+    barFindFiles > "$barName"
 
-    for file in "${barFiles[@]}"; do if ! [[ -d "$file" ]]; then ((counter++)); printf '%s %s,' "$file" "$counter"; fi; done > "$barName"
-    printf '\n' >> "$barName"
-
-    # Now create the bar assoc
     for file in "${barFiles[@]}"; do
         if ! [[ -d "$file" ]]; then
             barFileInfo
@@ -92,7 +100,7 @@ barCreate() {
 }
 
 barFileInfo(){
-    content="$(_cat $file | base64 -w 0)"
+    content="$($BAR_CAT $file | base64 -w 0)"
     read -r _ chmod uid gid < <(stat -c '%t %a %u %g' $file)
 }
 
@@ -113,14 +121,10 @@ barAppend(){
     local counter
     local tmpBarFile="$(mktemp)"
 
-    while IFS=, read -ra list; do read -r _ counter <<<"${list[-1]}"; break; done < "$barName"
+    while IFS=, read -ra list; do read -r _ counter <<<"${list[-1]}"; break; done < "$barName"  
 
     printf '%s %s,' ${list[@]} > "$tmpBarFile"
-    for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then barFiles+=("${files[$key]}"/**); else barFiles+=("${files[$key]}"); fi; done
-
-
-    for file in "${barFiles[@]}"; do if ! [[ -d "$file" ]]; then ((counter++)); printf '%s %s,' "$file" "$counter"; fi; done >> "$tmpBarFile"
-    printf '\n' >> "$tmpBarFile"
+    barFindFiles >> "$tmpBarFile"
 
     # Skip first line
     # XXX: With sed and _cat it would be MUCH faster...
@@ -137,7 +141,7 @@ barAppend(){
     done >> "$tmpBarFile"
 
     mv "$tmpBarFile" "$barName"
-
+        
 }
 
 barGetInfo(){
@@ -158,11 +162,11 @@ barView(){
     [[ -z "$info" ]] && _quit 2 "File not found"
     read -r _ _ _ _ content <<<"$info"
     printf '%s' "$content" | base64 -d | ${PAGER:-less}
-
+    
 }
 
 barList(){
-    while IFS=, read -ra file; do
+    while IFS=, read -ra file; do 
         printf '%s\n' "${file[@]%% *}"
         break
     done < "$barName"
@@ -220,11 +224,36 @@ barUncompress(){
     fi
 }
 
+barVerify(){
+    [[ -z "$barName" ]] && _quit 2 "Bar name not set! $HELP"
+
+    case "$mode" in 
+        create) 
+            [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
+        ;;
+        append)
+            [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
+        ;;
+        extract)
+            [[ -z "$destination" ]] && _quit 2 "Destination not defined! $HELP"
+        ;;
+        view)
+            [[ -z "$file" ]] && _quit 2 "file not defined! $HELP"
+        ;;
+    esac
+        
+}
+
+# create default modules
+: "${BAR_CAT:=_cat}"
+: "${BAR_COMPRESS:=gzip}"
+: "${BAR_UNCOMPRESS:=gunzip}"
+
 mode="create"
 
 while getopts "${OPTS}" arg; do
     case "${arg}" in
-        x)
+        x) 
             set -x
         ;;
         a)
@@ -233,10 +262,10 @@ while getopts "${OPTS}" arg; do
         X)
             mode=extract
         ;;
-        v)
+        v) 
             mode=view
         ;;
-        l)
+        l) 
             mode=list
         ;;
         n)
@@ -248,13 +277,13 @@ while getopts "${OPTS}" arg; do
         z)
             compress=1
         ;;
-        h)
-            _quit 0 "$HELP"
+        h) 
+            _quit 0 "$HELP" 
         ;;
-        ?)
+        ?) 
             _quit 1 "Invalid Argument: $USAGE"
         ;;
-        *)
+        *) 
             _quit 1 "$USAGE"
         ;;
     esac
@@ -266,11 +295,13 @@ barName="$1"; shift
 case "$mode" in
     create)
         files=($@)
+        barVerify
         barCreate
         barCompress
     ;;
     append)
         files=($@)
+        barVerify
         barUncompress
         barAppend
         barCompress
@@ -278,17 +309,20 @@ case "$mode" in
     extract)
         destination="${1:-./}"; shift
         files=($@)
+        barVerify
         barUncompress
         barExtract
         barCompress
     ;;
     view)
         file="$1"
+        barVerify
         barUncompress
         barView
         barCompress
     ;;
     list)
+        barVerify
         barUncompress
         barList
         barCompress
