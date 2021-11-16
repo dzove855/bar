@@ -53,7 +53,6 @@ $USAGE
         BAR_CAT         default : _cat
 
     NOTE:
-        Currently no compression is scripted
         Currently you can't extract single files in current directory
 
 "
