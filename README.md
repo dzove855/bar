@@ -53,7 +53,6 @@ Usage: bar.sh [azRXlvnxh]
 * Implement https:////github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
 * Implement edit
 * Implement remove
-* Implement timestamp
 
 
 # WHY?
