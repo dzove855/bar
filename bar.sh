@@ -6,7 +6,6 @@
 # TODO: Implement edit
 # TODO: Implement remove
 # TODO: Implement timestamp
-# TODO: Clean append and create and split up function
 
 SELF="${BASH_SOURCE[0]##*/}"
 NAME="${SELF%.sh}"
