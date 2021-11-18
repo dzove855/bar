@@ -4,12 +4,11 @@
 
 # TODO: Implement https:////github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
 # TODO: Implement edit
-# TODO: Implement remove
 
 SELF="${BASH_SOURCE[0]##*/}"
 NAME="${SELF%.sh}"
 
-OPTS="azRXlvnxh"
+OPTS="azrRXlvnxh"
 USAGE="Usage: $SELF [$OPTS]"
 
 HELP="
@@ -18,6 +17,7 @@ $USAGE
     Options:
         -a      Append
         -X      Extract
+        -r      Remove
         -l      list
         -v      View       
         -n      No dot files
@@ -221,14 +221,53 @@ barUncompress(){
     fi
 }
 
+barRemove(){
+    local -A index
+    local -a toIgnore
+    local counter=1
+    local tmpBarFile="$(mktemp)"
+    while IFS=, read -ra list; do for item in "${list[@]}"; do listFiles+=("$item"); read -r file line <<<"$item"; index[$file]="$line"; done; break; done < "$barName"
+
+    for file in "${files[@]}"; do
+        [[ -z "${index[$file]}" ]] || {
+            toIgnore+=("${index[$file]}")
+        }        
+    done
+
+    declare -p index
+    declare -p toIgnore
+
+    for item in "${listFiles[@]}"; do
+        read -r file line <<<"$item"
+        [[ " ${toIgnore[*]} " =~ " $line " ]] && continue
+
+        filesNewList+="$file $counter,"
+        (( counter++ ))
+    done
+
+    printf '%s\n' "$filesNewList" > $tmpBarFile
+    local counter=1
+    while read -r line; do
+        [[ -z "$s" ]] && { s=0; continue; }
+        [[ " ${toIgnore[*]} " =~ " $counter " ]] && { (( counter++ )); continue; }
+        printf '%s\n' "$line" >> $tmpBarFile
+        (( counter++ ))
+    done < "$barName"
+
+    mv "$tmpBarFile" "$barName"   
+}
+
 barVerify(){
     [[ -z "$barName" ]] && _quit 2 "Bar name not set! $HELP"
 
-    case "$mode" in 
-        create) 
+    case "$mode" in
+        create)
             [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
         ;;
         append)
+            [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
+        ;;
+        remove)
             [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
         ;;
         extract)
@@ -238,8 +277,9 @@ barVerify(){
             [[ -z "$file" ]] && _quit 2 "file not defined! $HELP"
         ;;
     esac
-        
+
 }
+
 
 # create default modules
 : "${BAR_CAT:=_cat}"
@@ -255,6 +295,9 @@ while getopts "${OPTS}" arg; do
         ;;
         a)
             mode=append
+        ;;
+        r)
+            mode=remove
         ;;
         X)
             mode=extract
@@ -301,6 +344,13 @@ case "$mode" in
         barVerify
         barUncompress
         barAppend
+        barCompress
+    ;;
+    remove)
+        files=($@)
+        barVerify
+        barUncompress
+        barRemove
         barCompress
     ;;
     extract)
