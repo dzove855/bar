@@ -234,9 +234,6 @@ barRemove(){
         }        
     done
 
-    declare -p index
-    declare -p toIgnore
-
     for item in "${listFiles[@]}"; do
         read -r file line <<<"$item"
         [[ " ${toIgnore[*]} " =~ " $line " ]] && continue
