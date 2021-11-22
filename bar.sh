@@ -49,7 +49,6 @@ $USAGE
     Environment Variable:
         BAR_COMPRESS    default : gzip
         BAR_UNCOMPRESS  default : gunzip
-        BAR_CAT         default : _cat
 
     NOTE:
         Currently you can't extract single files in current directory
@@ -72,7 +71,6 @@ _quit(){
 # Replace base64 by using the contenant above and replace cat by usin printf
 # This can decrease performance
 
-_cat(){ printf '%s' "$(<$1)"; }
 
 barFindFiles(){
     # Find files to archive and skeep directories
@@ -276,7 +274,6 @@ barVerify(){
 
 
 # create default modules
-: "${BAR_CAT:=_cat}"
 : "${BAR_COMPRESS:=gzip}"
 : "${BAR_UNCOMPRESS:=gunzip}"
 
