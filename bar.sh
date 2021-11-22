@@ -222,33 +222,30 @@ barUncompress(){
 }
 
 barRemove(){
-    local -A index
     local -a toIgnore
     local counter=1
     local tmpBarFile="$(mktemp)"
-    while IFS=, read -ra list; do for item in "${list[@]}"; do listFiles+=("$item"); read -r file line <<<"$item"; index[$file]="$line"; done; break; done < "$barName"
 
-    for file in "${files[@]}"; do
-        [[ -z "${index[$file]}" ]] || {
-            toIgnore+=("${index[$file]}")
-        }        
-    done
-
-    for item in "${listFiles[@]}"; do
-        read -r file line <<<"$item"
-        [[ " ${toIgnore[*]} " =~ " $line " ]] && continue
-
-        filesNewList+="$file $counter,"
-        (( counter++ ))
-    done
-
-    printf '%s\n' "$filesNewList" > $tmpBarFile
-    local counter=1
-    while read -r line; do
-        [[ -z "$s" ]] && { s=0; continue; }
-        [[ " ${toIgnore[*]} " =~ " $counter " ]] && { (( counter++ )); continue; }
-        printf '%s\n' "$line" >> $tmpBarFile
-        (( counter++ ))
+    while read -r line; do 
+        if [[ -z "$s" ]]; then
+            IFS=, read -ra list <<<"$line"
+            for item in "${list[@]}"; do 
+                read -r file line <<<"$item"
+                [[ " ${files[*]} " =~ " $file " ]] && {
+                    toIgnore+=("$line")
+                    continue
+                }
+                filesNewList+="$file $counter,"
+                (( counter++ ))
+            done
+            printf '%s\n' "$filesNewList" > $tmpBarFile
+            local counter=1
+            local s=0
+        else
+            [[ " ${toIgnore[*]} " =~ " $counter " ]] && { (( counter++ )); continue; }
+            printf '%s\n' "$line" >> $tmpBarFile
+            (( counter++ ))
+        fi
     done < "$barName"
 
     mv "$tmpBarFile" "$barName"   
