@@ -6,6 +6,7 @@
 # TODO: Implement edit
 
 SELF="${BASH_SOURCE[0]##*/}"
+# shellcheck disable=SC2034
 NAME="${SELF%.sh}"
 
 OPTS="azrRXlvnxh"
@@ -61,7 +62,7 @@ shopt -s globstar
 shopt -s dotglob
 
 _quit(){
-    local retCode="$1" msg="${@:2}"
+    local retCode="$1" msg="${*:2}"
 
     printf '%s \n' "$msg"
     exit "$retCode"
@@ -95,9 +96,9 @@ barCreate() {
 }
 
 barFileInfo(){
-    content="$(base64 -w 0 $file)"
-    read -r _ chmod uid gid timestamp < <(stat -c '%t %a %u %g %y' $file)
-    timestamp="${timestamp// /#}"
+    content="$(base64 -w 0 "$file")"
+    read -r _ chmod uid gid timestamp < <(stat -c '%t %a %u %g %y' "$file")
+    timestamp="${timestamp// /\#}"
 }
 
 barGetLine(){
@@ -115,10 +116,12 @@ barGetLine(){
 
 barAppend(){
     local counter
-    local tmpBarFile="$(mktemp)"
+    local tmpBarFile
+    tmpBarFile="$(mktemp)"
 
     while IFS=, read -ra list; do read -r _ counter <<<"${list[-1]}"; break; done < "$barName"  
 
+# shellcheck disable=SC2068
     printf '%s %s,' ${list[@]} > "$tmpBarFile"
     barFindFiles >> "$tmpBarFile"
 
@@ -142,8 +145,10 @@ barAppend(){
 
 barGetInfo(){
     local counter=0
-    local line=$(barGetLine)
-    while read ; do
+    local line
+    line=$(barGetLine)
+
+    while read -r ; do
         (( ( counter + 1 ) == line )) && {
             read -r name chmod uid gid timestamp content
             printf '%s %s %s %s %s %s' "$name" "$chmod" "$uid" "$gid" "$timestamp" "$content"
@@ -154,7 +159,9 @@ barGetInfo(){
 }
 
 barView(){
-    local info=$(barGetInfo)
+    local info
+    info=$(barGetInfo)
+
     [[ -z "$info" ]] && _quit 2 "File not found"
     read -r _ _ _ _ _ content <<<"$info"
     printf '%s' "$content" | base64 -d | ${PAGER:-less}
@@ -178,7 +185,7 @@ barExtractFile(){
 
 barExtractRights(){
     if [[ -z "$noRights" ]]; then
-        touch -d "${timestamp//#/ }"    "${destination%/}/$name"
+        touch -d "${timestamp//\#/ }"    "${destination%/}/$name"
         chown "$uid:$gid"               "${destination%/}/$name"
         chmod "$chmod"                  "${destination%/}/$name"
     fi
@@ -222,13 +229,15 @@ barUncompress(){
 barRemove(){
     local -a toIgnore
     local counter=1
-    local tmpBarFile="$(mktemp)"
+    local tmpBarFile
+    tmpBarFile="$(mktemp)"
 
     while read -r line; do 
         if [[ -z "$s" ]]; then
             IFS=, read -ra list <<<"$line"
             for item in "${list[@]}"; do 
                 read -r file line <<<"$item"
+# shellcheck disable=SC2076
                 [[ " ${files[*]} " =~ " $file " ]] && {
                     toIgnore+=("$line")
                     continue
@@ -236,12 +245,13 @@ barRemove(){
                 filesNewList+="$file $counter,"
                 (( counter++ ))
             done
-            printf '%s\n' "$filesNewList" > $tmpBarFile
+            printf '%s\n' "$filesNewList" > "$tmpBarFile"
             local counter=1
             local s=0
         else
+# shellcheck disable=SC2076
             [[ " ${toIgnore[*]} " =~ " $counter " ]] && { (( counter++ )); continue; }
-            printf '%s\n' "$line" >> $tmpBarFile
+            printf '%s\n' "$line" >> "$tmpBarFile"
             (( counter++ ))
         fi
     done < "$barName"
