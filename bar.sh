@@ -48,11 +48,14 @@ $USAGE
                 $SELF -X NAME.bar folder FILE1 FILE2
 
     Environment Variable:
-        BAR_COMPRESS    default : gzip
-        BAR_UNCOMPRESS  default : gunzip
+        BAR_COMPRESS            default : gzip
+        BAR_UNCOMPRESS          default : gunzip
+        BAR_LOADABLE_PATH       default : /usr/lib/bash
 
     NOTE:
         Currently you can't extract single files in current directory
+
+        If you use bar without the loadable finfo, you will hit the file limitation
 
 "
 
@@ -87,18 +90,18 @@ barCreate() {
 
     barFindFiles > "$barName"
 
+    _barStat
+
     for file in "${barFiles[@]}"; do
         if ! [[ -d "$file" ]]; then
             barFileInfo
-            printf '%s %s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$timestamp" "$content"
+            printf '%s %s %s %s %s %s\n' "$file" "${chmod[$counter]}" "${uid[$counter]}" "${gid[$counter]}" "${timestamp[$counter]}" "$content"
         fi
     done >> "$barName"
 }
 
 barFileInfo(){
     content="$(base64 -w 0 "$file")"
-    read -r _ chmod uid gid timestamp < <(stat -c '%t %a %u %g %y' "$file")
-    timestamp="${timestamp// /\#}"
 }
 
 barGetLine(){
@@ -132,11 +135,14 @@ barAppend(){
         s=0
     done < "$barName"
 
+    _barStat
+    counter=0
     for file in "${barFiles[@]}"; do
         if ! [[ -d "$file" ]]; then
             barFileInfo
-            printf '%s %s %s %s %s %s\n' "$file" "$chmod" "$uid" "$gid" "$timestamp" "$content"
+            printf '%s %s %s %s %s %s\n' "$file" "${chmod[$counter]}" "${uid[$counter]}" "${gid[$counter]}" "${timestamp[$counter]}" "$content"
         fi
+    (( counter++ ))
     done >> "$tmpBarFile"
 
     mv "$tmpBarFile" "$barName"
@@ -185,6 +191,7 @@ barExtractFile(){
 
 barExtractRights(){
     if [[ -z "$noRights" ]]; then
+        printf -v timestamp '%(%F %T)T' "$timestamp"
         touch -d "${timestamp//\#/ }"    "${destination%/}/$name"
         chown "$uid:$gid"               "${destination%/}/$name"
         chmod "$chmod"                  "${destination%/}/$name"
@@ -263,29 +270,46 @@ barVerify(){
     [[ -z "$barName" ]] && _quit 2 "Bar name not set! $HELP"
 
     case "$mode" in
-        create)
+        create|append|remove)
             [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
-        ;;
-        append)
-            [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
-        ;;
-        remove)
-            [[ -z "$files" ]] && _quit 2 "Files not defined! $HELP"
-        ;;
+        ;;&
         extract)
             [[ -z "$destination" ]] && _quit 2 "Destination not defined! $HELP"
-        ;;
+        ;;&
         view)
             [[ -z "$file" ]] && _quit 2 "file not defined! $HELP"
-        ;;
+        ;;&
     esac
 
 }
 
+_barStat(){
+    if PATH= type finfo &>/dev/null; then
+        chmod=( $(finfo -o ${barFiles[*]}) )
+        uid=( $(finfo -u ${barFiles[*]}) ) 
+        gid=( $(finfo -g ${barFiles[*]}) )
+        timestamp=( $( finfo -m ${barFiles[*]} ) )
+    else
+        chmod=( $(stat -c '%a' ${barFiles[*]}) )
+        uid=( $(stat -c '%u' ${barFiles[*]}) )
+        gid=( $(stat -c '%g' ${barFiles[*]}) )
+        timestamp=( $(stat -c '%Y' ${barFiles[*]}) )
+    fi 
+}
+
+barPath(){
+    # we will check for each command if they exist, if not use the default builtin
+    for _builtin in finfo; do
+        [[ -f "${BAR_LOADABLE_PATH%/}/$_builtin" ]] && {
+            enable -f "${BAR_LOADABLE_PATH%/}/$_builtin" "$_builtin"
+        }
+    done
+}
 
 # create default modules
 : "${BAR_COMPRESS:=gzip}"
 : "${BAR_UNCOMPRESS:=gunzip}"
+: "${BAR_LOADABLE_PATH:=/usr/lib/bash}"
 
 mode="create"
 
@@ -332,6 +356,7 @@ done
 shift $((OPTIND - 1))
 
 barName="$1"; shift
+barPath
 
 case "$mode" in
     create)
