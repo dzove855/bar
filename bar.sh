@@ -3,7 +3,6 @@
 # Just for fun :)
 
 # TODO: Implement https:////github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
-# TODO: Implement edit
 
 SELF="${BASH_SOURCE[0]##*/}"
 # shellcheck disable=SC2034
@@ -81,7 +80,7 @@ barFindFiles(){
     for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then barFiles+=("${files[$key]}"/**); else barFiles+=("${files[$key]}"); fi; done
     
     # Get files indexation
-    for file in "${barFiles[@]}"; do if ! [[ -d "$file" ]]; then ((counter++)); printf '%s %s,' "$file" "$counter"; fi; done
+    for file in "${barFiles[@]}"; do [[ " ${list[*]} " =~ " $file " ]] && continue; if ! [[ -d "$file" ]]; then ((counter++)); printf '%s %s,' "$file" "$counter"; fi; done
     printf '\n'
 }
 
@@ -128,16 +127,28 @@ barAppend(){
     printf '%s %s,' ${list[@]} > "$tmpBarFile"
     barFindFiles >> "$tmpBarFile"
 
+    orBarFiles=(${barFiles[@]})
+
     # Skip first line
     # XXX: With sed and _cat it would be MUCH faster...
-    while read -r line ; do
-        [[ -z "$s" ]] || { printf '%s\n' "$line" >> "$tmpBarFile"; continue; }
+    while read -r file line ; do
+        [[ -z "$s" ]] || { 
+            if [[ " ${barFiles[*]} " =~ " $file " ]]; then
+                barFiles=($file); _barStat; barFiles=(${orBarFiles[@]})
+                barFileInfo
+                printf '%s %s %s %s %s %s\n' "$file" "${chmod[0]}" "${uid[0]}" "${gid[0]}" "${timestamp[0]}" "$content" >> "$tmpBarFile"
+            else
+                printf '%s %s\n' "$file" "$line" >> "$tmpBarFile"
+                continue
+            fi
+        }
         s=0
     done < "$barName"
 
     _barStat
     counter=0
     for file in "${barFiles[@]}"; do
+         [[ " ${list[*]} " =~ " $file " ]] && continue
         if ! [[ -d "$file" ]]; then
             barFileInfo
             printf '%s %s %s %s %s %s\n' "$file" "${chmod[$counter]}" "${uid[$counter]}" "${gid[$counter]}" "${timestamp[$counter]}" "$content"
@@ -192,7 +203,7 @@ barExtractFile(){
 barExtractRights(){
     if [[ -z "$noRights" ]]; then
         printf -v timestamp '%(%F %T)T' "$timestamp"
-        touch -d "${timestamp//\#/ }"    "${destination%/}/$name"
+        touch -d "${timestamp//\#/ }"   "${destination%/}/$name"
         chown "$uid:$gid"               "${destination%/}/$name"
         chmod "$chmod"                  "${destination%/}/$name"
     fi
