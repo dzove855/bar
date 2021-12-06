@@ -105,15 +105,16 @@ barFileInfo(){
 
 barGetLine(){
     local line=0
-    while IFS=, read -ra list; do
-        for key in "${list[@]}"; do
-            [[ "${file}" == "${key%% *}" ]] && {
-                read -r _ line <<<"$key"
-                printf '%s' "$line"
-                return
-            }
-        done
-    done < "$barName"
+    mapfile -n 1 -t info <"$barName"
+    IFS=, read -ra list <<<"${info[0]}"
+    
+    for key in "${list[@]}"; do
+        [[ "${file}" == "${key%% *}" ]] && {
+            read -r _ line <<<"$key"
+            printf '%s' "$line"
+            return
+        }
+    done
 }
 
 barAppend(){
@@ -121,7 +122,9 @@ barAppend(){
     local tmpBarFile
     tmpBarFile="$(mktemp)"
 
-    while IFS=, read -ra list; do read -r _ counter <<<"${list[-1]}"; break; done < "$barName"  
+    mapfile -n 1 -t info <"$barName"
+    IFS=, read -ra list <<<"${info[0]}"
+    read -r _ counter <<<"${list[-1]}"
 
 # shellcheck disable=SC2068
     printf '%s %s,' ${list[@]} > "$tmpBarFile"
@@ -165,14 +168,11 @@ barGetInfo(){
     local line
     line=$(barGetLine)
 
-    while read -r ; do
-        (( ( counter + 1 ) == line )) && {
-            read -r name chmod uid gid timestamp content
-            printf '%s %s %s %s %s %s' "$name" "$chmod" "$uid" "$gid" "$timestamp" "$content"
-            return
-        }
-        (( counter++ ))
-    done < "$barName"
+    mapfile -n 1 -s "$line" -t info <"$barName"
+
+    read -r name chmod uid gid timestamp content <<<"${info[0]}"
+    printf '%s %s %s %s %s %s' "$name" "$chmod" "$uid" "$gid" "$timestamp" "$content"
+    return
 }
 
 barView(){
@@ -186,10 +186,11 @@ barView(){
 }
 
 barList(){
-    while IFS=, read -ra file; do 
+    mapfile -n 1 -t info <"$barName"
+    IFS=, read -ra list <<<"${info[0]}"
+    for file in "${list[@]}"; do
         printf '%s\n' "${file[@]%% *}"
-        break
-    done < "$barName"
+    done
 }
 
 barExtractMkdir(){
@@ -370,45 +371,38 @@ barName="$1"; shift
 barPath
 
 case "$mode" in
-    create)
-        files=($@)
-        barVerify
-        barCreate
-        barCompress
-    ;;
-    append)
-        files=($@)
-        barVerify
-        barUncompress
-        barAppend
-        barCompress
-    ;;
-    remove)
-        files=($@)
-        barVerify
-        barUncompress
-        barRemove
-        barCompress
-    ;;
     extract)
         destination="${1:-./}"; shift
+    ;;&
+    create|append|remove|extract)
         files=($@)
+    ;;&
+    *)
         barVerify
+    ;;&
+   append|remove|extract|view|list)
         barUncompress
+    ;;&
+    create)
+        barCreate
+    ;;&
+    append)
+        barAppend
+    ;;&
+    remove)
+        barRemove
+    ;;&
+    extract)
         barExtract
-        barCompress
-    ;;
+    ;;&
     view)
         file="$1"
-        barVerify
-        barUncompress
         barView
-        barCompress
-    ;;
+    ;;&
     list)
-        barVerify
-        barUncompress
         barList
+    ;;&
+    *)
         barCompress
     ;;
 esac
