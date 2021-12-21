@@ -8,7 +8,7 @@ SELF="${BASH_SOURCE[0]##*/}"
 # shellcheck disable=SC2034
 NAME="${SELF%.sh}"
 
-OPTS="azrRXlvnxh"
+OPTS="VazrRXlvnxh"
 USAGE="Usage: $SELF [$OPTS]"
 
 HELP="
@@ -25,6 +25,7 @@ $USAGE
         -z      Compress
         -s      Dry-run
         -x      Xtrace
+        -V      Verbose (can be call multiple times to get higher level)
 
     Example:
         Create a bar file
@@ -70,12 +71,39 @@ _quit(){
     exit "$retCode"
 }
 
+_verbose(){
+    # This function should be a simple debug function, which will print the line given based on debug level
+    # implement in getops the following line:
+    # (( DEBUG_LEVEL++))
+    local LEVEL=1 c printout
+    local funcnamenumber
+    (( funcnamenumber=${#FUNCNAME[@]} - 2 ))
+    : "${DEBUG_LEVEL:=0}"
+    (( DEBUG_LEVEL == 0 )) && return
+    # Add level 1 if first char is not set a number
+    [[ "$1" =~ ^[0-9]$ ]] && { LEVEL=$1; shift; }
+    
+    (( LEVEL <= DEBUG_LEVEL )) && {
+        until (( ${#c} == LEVEL )); do c+=":"; done
+        printout="+ $c    "
+        if (( funcnamenumber > 0 )); then
+            printout+="("
+            for ((i=1;i<=funcnamenumber;i++)); do
+                printout+="${FUNCNAME[$i]} <- "
+            done
+            printout="${printout% <- }) - "
+        fi
+        printf '%s\n' "$printout $*" 1>&2
+    }  
+}
+
 # https://github.com/hyperupcall/bash-algo/blob/main/pkg/lib/public/bash-algo.sh
 # Replace base64 by using the contenant above and replace cat by usin printf
 # This can decrease performance
 
-
 barFindFiles(){
+    _verbose "${files[*]}"
+
     # Find files to archive and skeep directories
     for key in "${!files[@]}"; do if [[ -d "${files[$key]}" ]]; then barFiles+=("${files[$key]}"/**); else barFiles+=("${files[$key]}"); fi; done
     
@@ -88,22 +116,26 @@ barCreate() {
     local counter=0
 
     barFindFiles > "$barName"
+    _verbose "${barFiles[*]}"
 
     _barStat
 
     for file in "${barFiles[@]}"; do
         if ! [[ -d "$file" ]]; then
             barFileInfo
+
+            _verbose 2 "$file chmod(${chmod[$counter]}) chown(${uid[$counter]}) chgrp(${gid[$counter]}) timestamp(${timestamp[$counter]})"
             printf '%s %s %s %s %s %s\n' "$file" "${chmod[$counter]}" "${uid[$counter]}" "${gid[$counter]}" "${timestamp[$counter]}" "$content"
         fi
     done >> "$barName"
 }
 
 barFileInfo(){
+    _verbose "$file"
     content="$(base64 -w 0 "$file")"
 }
 
-barGetLine(){
+biarGetLine(){
     local line=0
     mapfile -n 1 -t info <"$barName"
     IFS=, read -ra list <<<"${info[0]}"
@@ -111,6 +143,7 @@ barGetLine(){
     for key in "${list[@]}"; do
         [[ "${file}" == "${key%% *}" ]] && {
             read -r _ line <<<"$key"
+            _verbose "$key"
             printf '%s' "$line"
             return
         }
@@ -118,6 +151,7 @@ barGetLine(){
 }
 
 barAppend(){
+    _verbose "${files[*]}"
     local counter
     local tmpBarFile
     tmpBarFile="$(mktemp)"
@@ -164,6 +198,7 @@ barAppend(){
 }
 
 barGetInfo(){
+    _verbose "$file"
     local counter=0
     local line
     line=$(barGetLine)
@@ -178,6 +213,7 @@ barGetInfo(){
 barView(){
     local info
     info=$(barGetInfo)
+    _verbose "$info"
 
     [[ -z "$info" ]] && _quit 2 "File not found"
     read -r _ _ _ _ _ content <<<"$info"
@@ -187,6 +223,7 @@ barView(){
 
 barList(){
     mapfile -n 1 -t info <"$barName"
+    _verbose "${info[0]}"
     IFS=, read -ra list <<<"${info[0]}"
     for file in "${list[@]}"; do
         printf '%s\n' "${file[@]%% *}"
@@ -194,18 +231,26 @@ barList(){
 }
 
 barExtractMkdir(){
+    _verbose 2 "create ${destination%/}/${name%/*}"
     [[ -d "${destination%/}/${name%/*}" ]] || mkdir -p "${destination%/}/${name%/*}"
 }
 
 barExtractFile(){
+    _verbose 2 "create content to ${destination%/}/$name"
     printf '%s' "$content" | base64 -d > "${destination%/}/$name"
 }
 
 barExtractRights(){
     if [[ -z "$noRights" ]]; then
         printf -v timestamp '%(%F %T)T' "$timestamp"
+        
+        _verbose 2 "set timestamp (${timestamp//\#/ }) to ${destination%/}/$name"
         touch -d "${timestamp//\#/ }"   "${destination%/}/$name"
+        
+        _verbose 2 "chown ($uid:$gid) to ${destination%/}/$name"
         chown "$uid:$gid"               "${destination%/}/$name"
+
+        _verbose 2 "chmod ($chmod) to ${destination%/}/$name"
         chmod "$chmod"                  "${destination%/}/$name"
     fi
 }
@@ -213,6 +258,7 @@ barExtractRights(){
 barExtract(){
     local skip=1
     if [[ -z "${files[@]}" ]]; then
+        _verbose "extract all files"
         while read -r name chmod uid gid timestamp content; do
             ! [[ -z $skip ]] && { unset skip; continue; }
             barExtractMkdir
@@ -220,6 +266,7 @@ barExtract(){
             barExtractRights
         done < "$barName"
     else
+        _verbose "extract (${files[@]})"
         for file in "${files[@]}"; do
             info="$(barGetInfo)"
             [[ -z "$info" ]] && _quit 2 "File ($file) not found"
@@ -234,18 +281,21 @@ barExtract(){
 
 barCompress(){
     if ! [[ -z "$compress" ]]; then
+        _verbose 2 "Compress using $BAR_COMPRESS"
         ${BAR_COMPRESS} "${barName}"
     fi
 }
 
 barUncompress(){
     if ! [[ -z "$compress" ]]; then
+        _verbose 2 "Uncompress using $BAR_UNCOMPRESS"
         ${BAR_UNCOMPRESS} "${barName}"
         barName="${barName%.*}"
     fi
 }
 
 barRemove(){
+    _verbose "${files[@]}"
     local -a toIgnore
     local counter=1
     local tmpBarFile
@@ -280,6 +330,7 @@ barRemove(){
 
 barVerify(){
     [[ -z "$barName" ]] && _quit 2 "Bar name not set! $HELP"
+    _verbose 3 "$mode"
 
     case "$mode" in
         create|append|remove)
@@ -297,11 +348,13 @@ barVerify(){
 
 _barStat(){
     if PATH= type finfo &>/dev/null; then
+        _verbose 2 "using finfo"
         chmod=( $(finfo -o ${barFiles[*]}) )
         uid=( $(finfo -u ${barFiles[*]}) ) 
         gid=( $(finfo -g ${barFiles[*]}) )
         timestamp=( $( finfo -m ${barFiles[*]} ) )
     else
+        _verbose 2 "using stat"
         chmod=( $(stat -c '%a' ${barFiles[*]}) )
         uid=( $(stat -c '%u' ${barFiles[*]}) )
         gid=( $(stat -c '%g' ${barFiles[*]}) )
@@ -313,6 +366,7 @@ barPath(){
     # we will check for each command if they exist, if not use the default builtin
     for _builtin in finfo; do
         [[ -f "${BAR_LOADABLE_PATH%/}/$_builtin" ]] && {
+            _verbose 3 "enable ${BAR_LOADABLE_PATH%/}/$_builtin"
             enable -f "${BAR_LOADABLE_PATH%/}/$_builtin" "$_builtin"
         }
     done
@@ -327,6 +381,9 @@ mode="create"
 
 while getopts "${OPTS}" arg; do
     case "${arg}" in
+        V)
+            (( DEBUG_LEVEL++ ))
+        ;;
         x) 
             set -x
         ;;
