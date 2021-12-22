@@ -1,6 +1,9 @@
 # bar
 A simple archive tool in pure bash using baee64 and stat
 
+## Busion file
+This project use busion to create a portable version: https://github.com/dzove855/busion
+
 ## HELP
 
 
