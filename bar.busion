@@ -109,7 +109,7 @@ barFileInfo(){
     content="$(base64 -w 0 "$file")"
 }
 
-biarGetLine(){
+barGetLine(){
     local line=0
     mapfile -n 1 -t info <"$barName"
     IFS=, read -ra list <<<"${info[0]}"
